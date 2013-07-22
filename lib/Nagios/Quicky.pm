@@ -5,6 +5,8 @@ use warnings;
 use Carp;
 use Class::Accessor::Lite ( rw => [ qw( cfg_data nagios_cfg ) ] );
 use Path::Class;
+use Data::Dumper;
+use File::Find;
 our $VERSION = '0.01';
 
 our $default_config_path = qq{/usr/local/nagios/etc/nagios.cfg};
@@ -42,28 +44,100 @@ sub config_parser {
     }
     elsif ($line =~ /^\s*cfg_dir \s* \= \s*(\S+)/x) {
       my $dir_path = $1;
-      my $dh = dir( $dir_path )->open;
+      find(sub {
+                 my $file_path = $File::Find::name;
 
-      _CONFIG_LINE_:
-      while (my $target = $dh->read) {
-        if ($target .= /^\.*$/) {
-          next _CONFIG_LINE_;
-        } else {
-          my $file_path = file( $dir_path, $target );
-          $cfg .= get_content_from_file( $file_path );
-        }
-      }
+                 -f $file_path          or return;
+                 $file_path =~ /\.cfg$/ or return;
+                 my $file = file( $file_path );
+
+                 $cfg .= get_content_from_file( $file->stringify );
+               },
+               $dir_path);
     }
   }
 
   $self->cfg_data( $cfg );
 
+  $self->cfg_hash( $cfg );
+
   return $self;
 }
 
 
+sub cfg_hash {
+  my ($self) = @_;
+
+  $self->cfg_data
+    or croak "*** no nagios data";
+
+  my @defines =
+    $self->cfg_data =~ /^
+                           \s* ( define \s+ [^\{\s]+ \s* \{
+                              [^\}]+ )
+                          \}
+                      /xgms;
+
+  # {
+  #   command => {
+  #                check_pop3 => {
+  #                                command_line => q{$USER1$/check_pop -H $HOSTADDRESS$},
+  #                              },
+  #                check_ssh  => {
+  #                                command_line => q{$USER1$/check_ssh -H $HOSTADDRESS$},
+  #                              },
+  #              },
+  #   service => {
+  #                testvps01 => [
+  #                                q{check_mysql3!3306!$USER10$!$USER10$!$USER16$},
+  #                                q{check_ssh},
+  #                              ],
+  #                testvps02  => [
+  #                                q{check_mysql3!3306!$USER10$!$USER10$!$USER16$},
+  #                                q{check_nrpe!check_hosting_mn_mailq_count},
+  #                                q{check_nrpe!check_hosting_swap},
+  #                              ],
+  #              },
+  #   host => {
+  #             testvps01 => q{192.168.241.25},
+  #             testvps02 => q{192.168.241.28},
+  #           },
+  # }
+
+  my $hash_ref = +{};
+  no strict 'refs';
+  my (%host, %service, %command);
+  for my $x ( @defines ) {
+    my ($define_name, $data) =
+      $x =~ / define \s+
+                ([^\{\s]+)
+                  ( [^\}]+ )
+                #  \}
+           /xms or next;
+
+    if ($define_name eq q{host}) {
+      my ($address, $name);
+      if ($data =~ /address \s+(\S+)/x) {
+        $address = $1;
+      }
+      if ($data =~ /host_name \s+(\S+)/x) {
+        $name = $1;
+      }
+      if (defined $address and defined $name) {
+        $hash_ref->{host}->{$name} = $address;
+      }
+    }
+
+  }
+
+  return $hash_ref;
+
+}
+
+
 sub get_content_from_file {
-  open my $fh, "<", shift
+  my $file = shift;
+  open my $fh, "<", $file
     or croak "*** file open error";
   my $text = do { local $/; <$fh> };
   close $fh;
