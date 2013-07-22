@@ -59,13 +59,13 @@ sub config_parser {
 
   $self->cfg_data( $cfg );
 
-  $self->cfg_hash( $cfg );
+  $self->convert_data_to_hash;
 
   return $self;
 }
 
 
-sub cfg_hash {
+sub convert_data_to_hash {
   my ($self) = @_;
 
   $self->cfg_data
@@ -127,11 +127,28 @@ sub cfg_hash {
         $hash_ref->{host}->{$name} = $address;
       }
     }
-
+    elsif ($define_name eq q{service}) {
+      my $name;
+      if ($data =~ /host_name \s+(\S+)/x) {
+        $name = $1;
+        if ($data =~ /check_command \s+(\S+)/x) {
+          push @{$hash_ref->{service}->{$name}}, $1;
+        }
+      }
+    }
+    elsif ($define_name eq q{command}) {
+      my $name;
+      if ($data =~ /command_name \s+(\S+)/x) {
+        $name = $1;
+        if ($data =~ /command_line \s+(.+)/x) {
+          $hash_ref->{command}->{$name} = $1;
+        }
+      }
+    }
   }
 
+  warn Dumper $hash_ref if exists $ENV{DEBUG};
   return $hash_ref;
-
 }
 
 
@@ -139,7 +156,12 @@ sub get_content_from_file {
   my $file = shift;
   open my $fh, "<", $file
     or croak "*** file open error";
-  my $text = do { local $/; <$fh> };
+  my $text = qq{};
+  while (my $line = <$fh>) {
+    $line =~ /^\s*$/ and next;
+    $line =~ /^\s*#/ and next;
+    $text .= $line;
+  }
   close $fh;
   return $text;
 }
