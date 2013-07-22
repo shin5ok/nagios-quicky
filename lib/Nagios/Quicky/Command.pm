@@ -7,7 +7,6 @@ use Data::Dumper;
 use Parallel::ForkManager;
 use IPC::Cmd qw( run );
 use File::Basename;
-use DBI;
 use MongoDB;
 our $VERSION = '0.01';
 

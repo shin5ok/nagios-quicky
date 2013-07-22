@@ -2,7 +2,10 @@ use inc::Module::Install;
 name 'Nagios-Quicky';
 all_from 'lib/Nagios/Quicky.pm';
 
-# requires '';
+requires 'Parallel::ForkManager';
+requires 'Path::Class';
+requires 'MongoDB';
+requires 'Class::Accessor::Lite';
 
 tests 't/*.t';
 author_tests 'xt';
