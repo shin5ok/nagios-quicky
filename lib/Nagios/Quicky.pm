@@ -65,10 +65,9 @@ sub config_parser {
           $resource{$1} = $2;
         }
       }
+      $self->resource_params( \%resource );
     }
   }
-
-  $self->resource_params( \%resource );
 
   $self->cfg_data( $cfg );
 
