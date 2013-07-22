@@ -3,18 +3,19 @@ use 5.010;
 use strict;
 use warnings;
 use Carp;
-use Class::Accessor::Lite ( rw => [ qw( cfg_data nagios_cfg ) ] );
+use Class::Accessor::Lite ( rw => [ qw( cfg_data nagios_cfg cfg_params resource_params ) ] );
 use Path::Class;
 use Data::Dumper;
 use File::Find;
 our $VERSION = '0.01';
 
 our $default_config_path = qq{/usr/local/nagios/etc/nagios.cfg};
+our $debug = exists $ENV{DEBUG} ? $ENV{DEBUG} : 0;
 
 sub new {
   my ($class, $nagios_cfg, $args) = @_;
 
-  $nagios_cfg ||= $default_config_path;
+  $nagios_cfg //= $default_config_path;
 
   my $obj = bless +{}, $class;
 
@@ -29,6 +30,8 @@ sub config_parser {
 
   open my $fh, "<", $self->nagios_cfg
     or croak "*** nagios.cfg open failure";
+
+  my %resource = ();
 
   my $cfg = qq{};
   _CONFIG_FILE_:
@@ -55,7 +58,17 @@ sub config_parser {
                },
                $dir_path);
     }
+    elsif ($line =~ /^\s*resource_file \s* \= \s*(\S+)/x) {
+      for my $line ( split /\n/, get_content_from_file( $1 ) ) {
+        $line =~ /^\s*#/ and next;
+        if ($line =~ /^\s*(\$[^\=\s]+)\s*\=\s*(\S+)/) {
+          $resource{$1} = $2;
+        }
+      }
+    }
   }
+
+  $self->resource_params( \%resource );
 
   $self->cfg_data( $cfg );
 
@@ -89,19 +102,33 @@ sub convert_data_to_hash {
   #              },
   #   service => {
   #                testvps01 => [
-  #                                q{check_mysql3!3306!$USER10$!$USER10$!$USER16$},
-  #                                q{check_ssh},
+  #                                {
+  #                                  description => 'check_mysql3',
+  #                                  command     => q{check_mysql3!3306!$USER10$!$USER10$!$USER16$},
+  #                                },
+  #                                {
+  #                                  description => q{check_ssh},
+  #                                  command     => q{check_nrpe!check_hosting_mn_mailq_count},
+  #                                },
   #                              ],
   #                testvps02  => [
-  #                                q{check_mysql3!3306!$USER10$!$USER10$!$USER16$},
-  #                                q{check_nrpe!check_hosting_mn_mailq_count},
-  #                                q{check_nrpe!check_hosting_swap},
+  #                                {
+  #                                  description => 'check_mysql3',
+  #                                  command     => q{check_mysql3!3306!$USER10$!$USER10$!$USER16$},
+  #                                },
+  #                                {
+  #                                  description => 'check_mysql8',
+  #                                  command     =>  q{check_nrpe!check_hosting_mn_mailq_count},
+  #                                },
   #                              ],
   #              },
   #   host => {
   #             testvps01 => q{192.168.241.25},
   #             testvps02 => q{192.168.241.28},
   #           },
+  #   resource => {
+  #                 '$USER1$' => '/usr/local/nagios/libexec',
+  #               },
   # }
 
   my $hash_ref = +{};
@@ -111,8 +138,7 @@ sub convert_data_to_hash {
     my ($define_name, $data) =
       $x =~ / define \s+
                 ([^\{\s]+)
-                  ( [^\}]+ )
-                #  \}
+                ( [^\}]+ )
            /xms or next;
 
     if ($define_name eq q{host}) {
@@ -128,11 +154,18 @@ sub convert_data_to_hash {
       }
     }
     elsif ($define_name eq q{service}) {
-      my $name;
+      my ($name, $description);
       if ($data =~ /host_name \s+(\S+)/x) {
         $name = $1;
-        if ($data =~ /check_command \s+(\S+)/x) {
-          push @{$hash_ref->{service}->{$name}}, $1;
+        if ($data =~ /service_description \s+ (\S+)/x) {
+          $description = $1;
+          if ($data =~ /check_command \s+(\S+)/x) {
+            my $ref = +{
+                         description => $description,
+                         command     => $1,
+                       };
+            push @{$hash_ref->{service}->{$name}}, $ref;
+          }
         }
       }
     }
@@ -147,15 +180,15 @@ sub convert_data_to_hash {
     }
   }
 
-  warn Dumper $hash_ref if exists $ENV{DEBUG};
-  return $hash_ref;
+  $self->cfg_params( $hash_ref );
+  return $self;
 }
 
 
 sub get_content_from_file {
   my $file = shift;
   open my $fh, "<", $file
-    or croak "*** file open error";
+    or croak "*** file $file open error";
   my $text = qq{};
   while (my $line = <$fh>) {
     $line =~ /^\s*$/ and next;
