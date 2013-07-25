@@ -99,7 +99,7 @@ sub parallel_command {
                      stderr      => $v->{stderr},
                      stdout      => $v->{stdout},
                      description => $v->{description},
-                     success     => $v->{success},
+                     success     => $v->{success} // 0,
                    };
 
   }
