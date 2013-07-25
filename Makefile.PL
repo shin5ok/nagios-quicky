@@ -6,6 +6,7 @@ requires 'Parallel::ForkManager';
 requires 'Path::Class';
 requires 'MongoDB';
 requires 'Class::Accessor::Lite';
+requires 'Mojolicious::Lite';
 
 tests 't/*.t';
 author_tests 'xt';

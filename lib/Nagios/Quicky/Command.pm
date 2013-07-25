@@ -88,22 +88,25 @@ sub parallel_command {
 
   $pfork->wait_all_children;
 
+  my $all_ok = 1;
+
   my $coll = _connect_db();
   my @results;
   for my $v ( $coll->find( { check_id => $check_id } )->all ) {
+    $v->{success} or $all_ok = 0;
     push @results, +{
                      command     => $v->{command},
                      stderr      => $v->{stderr},
                      stdout      => $v->{stdout},
-                     id          => $v->{id},
                      description => $v->{description},
                      success     => $v->{success},
                    };
 
   }
 
-  warn Dumper \@results if $debug;
-  return \@results;
+  my $result_data = +{ all_ok => $all_ok, result => \@results };
+  warn Dumper $result_data if $debug;
+  return $result_data;
 
 }
 

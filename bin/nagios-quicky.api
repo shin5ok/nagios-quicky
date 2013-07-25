@@ -1,0 +1,50 @@
+#!/usr/bin/env perl
+use 5.014;
+use strict;
+use warnings;
+
+use Mojolicious::Lite;
+use FindBin;
+use lib qq($FindBin::Bin/../lib);
+use Nagios::Quicky::Command;
+
+helper nagios_quicky => sub {
+  no warnings;
+  local $Nagios::Quicky::Command::default_procs = 10;
+  return Nagios::Quicky::Command->new;
+};
+
+
+app->renderer->default_format('json');
+get '/check/(#host)' => sub {
+  my $self = shift;
+
+  my $x = $self->nagios_quicky;
+
+  local $ENV{DEBUG} = 1;
+  my $host = $self->param('host');
+  my $ref = $x->exec( $host );
+
+  my $all_ok = delete $ref->{all_ok}
+             ? 1
+             : 0;
+
+  $self->render(
+                 json => {
+                           result => 1,
+                           data   => {
+                                       checked => $ref,
+                                       all_ok  => $all_ok,
+                                     }
+                         }
+               );
+
+};
+
+app->start;
+
+
+__DATA__
+@@ exception.json.ep
+% use Mojo::JSON;
+% return Mojo::JSON->new->encode( { result => 0 } );
