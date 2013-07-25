@@ -1,0 +1,55 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+
+use Sys::Hostname;
+use JSON;
+use opts;
+use LWP::UserAgent;
+use Data::Dumper;
+
+opts my $api => { isa => 'Str' };
+
+my $nagios_quicky_api = defined $api
+                      ? $api
+                      : exists $ENV{NAGIOS_QUICKY_API}
+                      ? $ENV{NAGIOS_QUICKY_API}
+                      : q{http://127.0.0.1:3000};
+
+my $host = shift @ARGV;
+if (! defined $host) {
+  ($host) = hostname() =~ /^([^\.]+)/;
+}
+
+my $ua = LWP::UserAgent->new;
+$ua->timeout(10);
+
+$nagios_quicky_api =~ s{/+$}{}g;
+my $uri = URI->new( $nagios_quicky_api . "/check/" . $host );
+my $response = $ua->get( $uri->as_string );
+
+if ($response->is_success) {
+  my $result_ref = decode_json $response->content;
+
+  my $checked = $result_ref->{data}->{checked};
+
+  printf "target     : $host\n";
+  printf "check count: %d\n", @{$checked->{result}} + 0;
+  print "------------------------------------------------------------------------------------------\n";
+  my $error = 0;
+  no strict 'refs';
+  for my $x ( @{$checked->{result}} ) {
+    my $output = $x->{stdout}->[0] // qq{};
+    $output =~ s/\n/ /g;
+    $x->{success} or $error = 1;
+    printf "%25s: %s\n", $x->{description}, $x->{success} ? "OK" : "*** ERROR($output)";
+  }
+  print "------------------------------------------------------------------------------------------\n";
+
+  exit ($error == 0 ? 0 : 1 );
+
+} else {
+  warn "api($uri) http error...";
+  exit 2;
+}
+

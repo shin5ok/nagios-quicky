@@ -30,7 +30,7 @@ sub exec {
   my $ip        = $self->cfg_params->{host}->{$host};
 
   if (! defined $check_ref or ! defined $ip) {
-    croak "*** host params is not found";
+    croak "*** monitor for host is not found";
   }
 
   my $define_command = $self->cfg_params->{command};
@@ -103,6 +103,8 @@ sub parallel_command {
                    };
 
   }
+  @results = sort { $a->{description} cmp $b->{description} }
+                  @results;
 
   my $result_data = +{ all_ok => $all_ok, result => \@results };
   warn Dumper $result_data if $debug;
