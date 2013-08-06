@@ -1,0 +1,65 @@
+#!/bin/sh
+# chkconfig: 35 80 10
+# description: nagios-quicky init script
+
+prog=nagios-quicky
+
+. /etc/rc.d/init.d/functions
+
+lockfile=/var/lock/subsys/$prog
+config=/etc/sysconfig/$prog
+pid=/var/run/$prog.pid
+
+if [ -f $config ];
+then
+  . $config
+fi
+
+if [ -z $NAGIOS_QUICKY_API ];
+then
+  NAGIOS_QUICKY_API="/usr/local/bin/nagios-quicky.api";
+fi
+command="starman --port 5000 --pid $pid -D $NAGIOS_QUICKY_API"
+
+PATH=/usr/local/perl/bin:$PATH
+PATH=/home/smc/local/perl/bin:$PATH
+export PATH
+
+start() {
+    echo -n $"Starting $prog: "
+    # $command
+    daemon $command
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && touch $lockfile
+}
+
+stop() {
+    echo -n $"Stopping $prog: "
+    daemon kill `cat $pid`
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && rm -f $lockfile
+}
+
+restart() {
+    stop
+    start
+}
+
+case "$1" in
+    start)
+        $1
+        ;;
+    stop)
+        $1
+        ;;
+    restart)
+        $1
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|restart}"
+        exit 2
+esac
+exit $?
+
