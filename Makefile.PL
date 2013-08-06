@@ -7,6 +7,7 @@ requires 'Path::Class';
 requires 'MongoDB';
 requires 'Class::Accessor::Lite';
 requires 'Mojolicious::Lite';
+requires 'Starman';
 
 tests 't/*.t';
 author_tests 'xt';

@@ -4,6 +4,8 @@ use strict;
 use warnings;
 use utf8;
 
+use File::Basename;
+use Carp;
 use Mojolicious::Lite;
 use FindBin;
 use lib qq($FindBin::Bin/../lib);
@@ -11,7 +13,7 @@ use Nagios::Quicky::Command;
 
 helper nagios_quicky => sub {
   no warnings;
-  local $Nagios::Quicky::Command::default_procs = 10;
+  local $Nagios::Quicky::Command::default_procs = 8;
   return Nagios::Quicky::Command->new;
 };
 
@@ -39,6 +41,21 @@ get '/check/(#host)' => sub {
                                      }
                          }
                );
+
+};
+
+get '/cli' => sub {
+  my $self = shift;
+
+  my $code = qq{};
+  my $dir = dirname __FILE__;
+  my $cli_file_path = qq($dir/nagios-quicky.cli);
+  open my $fh, "<", $cli_file_path
+    or croak "cannot file open($cli_file_path)";
+  $code .= $_ while (<$fh>);
+  close $fh;
+
+  $self->render( text => $code );
 
 };
 
