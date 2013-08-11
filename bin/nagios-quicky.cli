@@ -14,7 +14,7 @@ my $nagios_quicky_api = defined $api
                       ? $api
                       : exists $ENV{NAGIOS_QUICKY_API}
                       ? $ENV{NAGIOS_QUICKY_API}
-                      : q{http://127.0.0.1:3000};
+                      : q{http://127.0.0.1:5000/check};
 
 my $host = shift @ARGV;
 if (! defined $host) {
@@ -25,7 +25,7 @@ my $ua = LWP::UserAgent->new;
 $ua->timeout(10);
 
 $nagios_quicky_api =~ s{/+$}{}g;
-my $uri = URI->new( $nagios_quicky_api . "/check/" . $host );
+my $uri = URI->new( $nagios_quicky_api . "/$host" );
 my $response = $ua->get( $uri->as_string );
 
 if ($response->is_success) {
