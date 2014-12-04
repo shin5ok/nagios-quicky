@@ -4,11 +4,15 @@ use warnings;
 
 use Sys::Hostname;
 use JSON;
-use opts;
 use LWP::UserAgent;
 use Data::Dumper;
 
-opts my $api => { isa => 'Str' };
+use Getopt::Long;
+
+my $api;
+GetOptions(
+  "api=s" => \$api,
+);
 
 my $nagios_quicky_api = defined $api
                       ? $api
