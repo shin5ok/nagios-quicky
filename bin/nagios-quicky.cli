@@ -22,7 +22,11 @@ my $nagios_quicky_api = defined $api
 
 my $host = shift @ARGV;
 if (! defined $host) {
-  ($host) = hostname() =~ /^([^\.]+)/;
+  $host = exists $ENV{NAGIOS_TARGET_HOST}
+        ? $ENV{NAGIOS_TARGET_HOST}
+        : hostname() =~ /^([^\.]+)/
+        ? $1
+        : "";
 }
 
 my $ua = LWP::UserAgent->new;
